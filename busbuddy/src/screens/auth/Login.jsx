@@ -6,59 +6,74 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
-  KeyboardAvoidingView,
-  Platform,
   Image,
+  Alert,
 } from 'react-native';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const handleLogin = () => {
-    // Implement login logic here
+    if (!email || !password) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+    // Add your login logic here
     console.log('Login with:', email, password);
   };
 
-  const handleGoogleLogin = () => {
-    // Implement Google OAuth 2.0 logic here
-    console.log('Google Login');
+  const handleGoogleSignIn = async () => {
+    try {
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+      console.log('Google Sign-In Success:', userInfo);
+      // Add your Google auth logic here
+    } catch (error) {
+      console.error('Google Sign-In Error:', error);
+      Alert.alert('Error', 'Google Sign-In failed');
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}>
-        <View style={styles.content}>
-          {/* Logo */}
-          <View style={styles.logoContainer}>
-            <View style={styles.logo}>
-              <Text style={styles.logoText}>🚌</Text>
+      <View style={styles.content}>
+        {/* Logo */}
+        <View style={styles.logoContainer}>
+          <View style={styles.logo}>
+            <View style={styles.logoIcon}>
+              <View style={styles.mapPin1} />
+              <View style={styles.mapPin2} />
+              <View style={styles.routeLine} />
             </View>
-            <Text style={styles.appName}>Bus App</Text>
           </View>
+          <Text style={styles.appName}>BusBuddy</Text>
+        </View>
 
-          {/* Welcome Text */}
-          <Text style={styles.welcomeText}>Welcome Back!</Text>
-          <Text style={styles.subtitle}>Sign in to continue</Text>
+        {/* Welcome Text */}
+        <Text style={styles.welcomeText}>Welcome Back!</Text>
+        <Text style={styles.subText}>Sign in to continue</Text>
 
-          {/* Input Fields */}
+        {/* Input Fields */}
+        <View style={styles.form}>
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
               placeholder="Email"
-              placeholderTextColor="#8B9DC3"
+              placeholderTextColor="#9CA3D4"
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
             />
+          </View>
 
+          <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
               placeholder="Password"
-              placeholderTextColor="#8B9DC3"
+              placeholderTextColor="#9CA3D4"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -68,7 +83,8 @@ const LoginScreen = ({ navigation }) => {
           {/* Forgot Password */}
           <TouchableOpacity
             onPress={() => navigation.navigate('ForgotPassword')}
-            style={styles.forgotContainer}>
+            style={styles.forgotContainer}
+          >
             <Text style={styles.forgotText}>Forgot password?</Text>
           </TouchableOpacity>
 
@@ -87,9 +103,9 @@ const LoginScreen = ({ navigation }) => {
           {/* Google Sign In */}
           <TouchableOpacity
             style={styles.googleButton}
-            onPress={handleGoogleLogin}>
-            <Text style={styles.googleIcon}>G</Text>
-            <Text style={styles.googleButtonText}>Continue with Google</Text>
+            onPress={handleGoogleSignIn}
+          >
+            <Text style={styles.googleButtonText}>🔍 Continue with Google</Text>
           </TouchableOpacity>
 
           {/* Sign Up Link */}
@@ -100,7 +116,7 @@ const LoginScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 };
@@ -108,14 +124,11 @@ const LoginScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0A1628',
-  },
-  keyboardView: {
-    flex: 1,
+    backgroundColor: '#1a237e',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 30,
+    padding: 24,
     justifyContent: 'center',
   },
   logoContainer: {
@@ -126,115 +139,138 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 20,
-    backgroundColor: '#1E3A5F',
+    backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 12,
   },
-  logoText: {
-    fontSize: 40,
+  logoIcon: {
+    width: 50,
+    height: 50,
+    position: 'relative',
+  },
+  mapPin1: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#7c4dff',
+    position: 'absolute',
+    top: 5,
+    left: 10,
+    borderWidth: 2,
+    borderColor: '#5e35b1',
+  },
+  mapPin2: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#7c4dff',
+    position: 'absolute',
+    top: 5,
+    right: 10,
+    borderWidth: 2,
+    borderColor: '#5e35b1',
+  },
+  routeLine: {
+    width: 30,
+    height: 2,
+    backgroundColor: '#7c4dff',
+    position: 'absolute',
+    top: 30,
+    left: 10,
+    borderRadius: 1,
   },
   appName: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#FFFFFF',
+    color: '#fff',
   },
   welcomeText: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#FFFFFF',
+    color: '#fff',
+    textAlign: 'center',
     marginBottom: 8,
-    textAlign: 'center',
   },
-  subtitle: {
+  subText: {
     fontSize: 16,
-    color: '#8B9DC3',
-    marginBottom: 40,
+    color: '#B8C1E8',
     textAlign: 'center',
+    marginBottom: 40,
+  },
+  form: {
+    width: '100%',
   },
   inputContainer: {
-    marginBottom: 15,
+    marginBottom: 16,
   },
   input: {
-    backgroundColor: '#1E3A5F',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     borderRadius: 12,
-    padding: 18,
+    padding: 16,
     fontSize: 16,
-    color: '#FFFFFF',
-    marginBottom: 15,
+    color: '#fff',
     borderWidth: 1,
-    borderColor: '#2A4A70',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   forgotContainer: {
     alignSelf: 'flex-end',
-    marginBottom: 30,
+    marginBottom: 24,
   },
   forgotText: {
-    color: '#6C8EBF',
+    color: '#B8C1E8',
     fontSize: 14,
   },
   loginButton: {
-    backgroundColor: '#7C5CFF',
+    backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 18,
+    padding: 16,
     alignItems: 'center',
-    marginBottom: 25,
-    shadowColor: '#7C5CFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    marginBottom: 20,
   },
   loginButtonText: {
-    color: '#FFFFFF',
+    color: '#1a237e',
     fontSize: 18,
     fontWeight: 'bold',
   },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 25,
+    marginVertical: 20,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#2A4A70',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   dividerText: {
-    color: '#8B9DC3',
-    paddingHorizontal: 15,
+    color: '#B8C1E8',
+    paddingHorizontal: 10,
     fontSize: 14,
   },
   googleButton: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 18,
+    padding: 16,
     alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 30,
-  },
-  googleIcon: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginRight: 10,
-    color: '#4285F4',
+    marginBottom: 24,
   },
   googleButtonText: {
-    color: '#0A1628',
+    color: '#1a237e',
     fontSize: 16,
     fontWeight: '600',
   },
   signupContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   signupText: {
-    color: '#8B9DC3',
+    color: '#B8C1E8',
     fontSize: 14,
   },
   signupLink: {
-    color: '#7C5CFF',
+    color: '#fff',
     fontSize: 14,
     fontWeight: 'bold',
   },
