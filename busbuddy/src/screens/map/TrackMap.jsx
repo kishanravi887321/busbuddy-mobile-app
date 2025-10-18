@@ -14,8 +14,8 @@ import {
   AppState 
 } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
-import VIForegroundService from '@voximplant/react-native-foreground-service';
 import io from 'socket.io-client';
+import notificationService from '../services/notificationService';
 
 // Socket.IO Configuration (Testing)
 const SOCKET_URL = 'https://where-is-mybus.onrender.com';
@@ -33,7 +33,9 @@ const TrackMap = () => {
   const [socketConnected, setSocketConnected] = useState(false);
   const [socketError, setSocketError] = useState(null);
   const watchId = useRef(null);
-  const notificationIntervalId = useRef(null);
+  const isTrackingRef = useRef(false); // Ref to track state in callbacks
+  const isPausedRef = useRef(false);   // Ref to track pause state in callbacks
+  const notificationCheckInterval = useRef(null); // Check if notification is dismissed
   const socketRef = useRef(null);
   const lastPosition = useRef(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -188,23 +190,9 @@ const TrackMap = () => {
     };
   }, []);
 
-  // Create notification channel (required on Android 8+)
+  // Initialize notification service
   useEffect(() => {
-    const createChannel = async () => {
-      try {
-        await VIForegroundService.getInstance().createNotificationChannel({
-          id: 'live_tracking',
-          name: 'Live Location Tracking',
-          description: 'Shows persistent notification while tracking your location',
-          enableVibration: false,
-          importance: 4, // IMPORTANCE_HIGH - ensures notification is always visible
-        });
-        console.log('✅ Notification channel created successfully');
-      } catch (err) {
-        console.error('❌ Failed to create notification channel:', err);
-      }
-    };
-    createChannel();
+    notificationService.initializeChannel();
 
     // Monitor app state for background/foreground changes
     const appStateSubscription = AppState.addEventListener('change', nextAppState => {
@@ -286,37 +274,16 @@ const TrackMap = () => {
 
   // Update notification with current state
   const updateNotification = async (paused = false) => {
-    try {
-      const elapsedTime = trackingStartTime 
-        ? Math.floor((Date.now() - trackingStartTime) / 1000 / 60) 
-        : 0;
+    const elapsedTime = trackingStartTime 
+      ? Math.floor((Date.now() - trackingStartTime) / 1000 / 60) 
+      : 0;
 
-      const currentTime = new Date().toLocaleTimeString('en-US', { 
-        hour12: false, 
-        hour: '2-digit', 
-        minute: '2-digit', 
-        second: '2-digit' 
-      });
-
-      await VIForegroundService.getInstance().startService({
-        channelId: 'live_tracking',
-        id: 144,
-        title: paused 
-          ? '⏸️ BusBuddy - Tracking Paused' 
-          : `🚍 BusBuddy - Live Tracking [${currentTime}]`,
-        text: paused
-          ? `Tracking paused | ${totalDistance.toFixed(2)} km tracked`
-          : `${elapsedTime} min • ${totalDistance.toFixed(2)} km • ${location?.speed || 0} km/h`,
-        icon: 'ic_notification',
-        priority: 2,
-        button: paused ? 'Resume' : 'Pause',
-        ongoing: true, // Makes notification non-dismissible (can't swipe away)
-      });
-      
-      console.log(`🔔 Notification updated at ${currentTime}`);
-    } catch (err) {
-      console.error('Failed to update notification:', err);
-    }
+    await notificationService.updateNotification({
+      paused,
+      elapsedMinutes: elapsedTime,
+      distance: totalDistance,
+      speed: location?.speed || 0,
+    });
   };
 
   const startTracking = async () => {
@@ -380,15 +347,12 @@ const TrackMap = () => {
         
         setLocation(locationData);
         
-        // Send location to Socket.IO server
-        if (!isPaused) {
+        // Send location to Socket.IO server every second (only when tracking and not paused)
+        if (isTrackingRef.current && !isPausedRef.current) {
           sendLocationToServer(locationData);
         }
         
-        // Update notification with live data
-        if (!isPaused) {
-          updateNotification(false);
-        }
+        // Notification updates handled separately (not here to avoid spam)
         
         console.log(`📍 Location: ${latitude}, ${longitude} | Accuracy: ${accuracy || 'N/A'}m | Speed: ${speed || 0}m/s`);
       },
@@ -407,15 +371,19 @@ const TrackMap = () => {
       }
     );
 
-    // Force notification updates every 1 second (keeps it visible and up-to-date)
-    notificationIntervalId.current = setInterval(() => {
-      if (!isPaused) {
-        updateNotification(false);
+    // No periodic notification updates - notification stays static after creation
+    // But check every 15 seconds if notification was dismissed and recreate it
+    notificationCheckInterval.current = setInterval(() => {
+      if (isTrackingRef.current) {
+        // Recreate notification if it was swiped away (ring once on reappear)
+        updateNotification(isPausedRef.current);
       }
-    }, 1000); // Update notification every 1 second
+    }, 15000); // Check every 15 seconds
 
     setIsTracking(true);
+    isTrackingRef.current = true; // Update ref for GPS callback
     setIsPaused(false);
+    isPausedRef.current = false;  // Update ref for GPS callback
     setIsLoading(false);
     console.log('✅ Tracking started successfully');
     Alert.alert('Tracking Started', 'Location tracking is now active. You can minimize the app.');
@@ -423,12 +391,14 @@ const TrackMap = () => {
 
   const pauseTracking = () => {
     setIsPaused(true);
+    isPausedRef.current = true; // Update ref
     updateNotification(true);
     console.log('⏸️ Tracking paused');
   };
 
   const resumeTracking = () => {
     setIsPaused(false);
+    isPausedRef.current = false; // Update ref
     updateNotification(false);
     console.log('▶️ Tracking resumed');
   };
@@ -436,17 +406,21 @@ const TrackMap = () => {
   const stopTracking = async () => {
     setIsLoading(true);
     
+    // Update refs immediately to stop socket sending
+    isTrackingRef.current = false;
+    isPausedRef.current = false;
+    
     if (watchId.current !== null) {
       Geolocation.clearWatch(watchId.current);
       watchId.current = null;
       console.log('📍 Location watch cleared');
     }
 
-    // Clear notification update interval
-    if (notificationIntervalId.current !== null) {
-      clearInterval(notificationIntervalId.current);
-      notificationIntervalId.current = null;
-      console.log('🔔 Notification interval cleared');
+    // Clear notification check interval
+    if (notificationCheckInterval.current !== null) {
+      clearInterval(notificationCheckInterval.current);
+      notificationCheckInterval.current = null;
+      console.log('🔔 Notification check interval cleared');
     }
 
     try {
