@@ -4,7 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {enanbleScreens} from 'react-native-screens';
 
-enanbleScreens(); 
+// enanbleScreens(); 
 
 // Import Root Navigator
 import { RootNavigator } from './src/navigation';

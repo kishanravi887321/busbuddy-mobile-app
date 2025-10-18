@@ -5,201 +5,282 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  StatusBar,
-  ScrollView,
+  SafeAreaView,
+  Alert,
 } from 'react-native';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
-const SignupScreen = ({ navigation }) => {
-  const [fullName, setFullName] = useState('');
+const SignUpScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  const handleSignup = () => {
-    // Add your signup logic here
-    console.log('Signup pressed');
+  const handleSignUp = () => {
+    if (!email || !password || !confirmPassword) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters');
+      return;
+    }
+
+    // Add your sign up logic here
+    console.log('Sign up with:', email, password);
+  };
+
+  const handleGoogleSignUp = async () => {
+    try {
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+      console.log('Google Sign-Up Success:', userInfo);
+      // Add your Google auth logic here
+    } catch (error) {
+      console.error('Google Sign-Up Error:', error);
+      Alert.alert('Error', 'Google Sign-Up failed');
+    }
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#9B7EDE" />
-      
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* App Icon */}
-        <View style={styles.iconContainer}>
-          <View style={styles.iconBox}>
-            <Text style={styles.iconText}>🚌</Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        {/* Logo */}
+        <View style={styles.logoContainer}>
+          <View style={styles.logo}>
+            <View style={styles.logoIcon}>
+              <View style={styles.mapPin1} />
+              <View style={styles.mapPin2} />
+              <View style={styles.routeLine} />
+            </View>
           </View>
           <Text style={styles.appName}>BusBuddy</Text>
         </View>
 
-        {/* Create Account Text */}
-        <Text style={styles.titleText}>Create Account</Text>
-        <Text style={styles.subtitleText}>Join BusBuddy today!</Text>
+        {/* Welcome Text */}
+        <Text style={styles.welcomeText}>Create Account</Text>
+        <Text style={styles.subText}>Sign up to get started</Text>
 
         {/* Input Fields */}
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Full Name"
-            placeholderTextColor="rgba(255, 255, 255, 0.6)"
-            value={fullName}
-            onChangeText={setFullName}
-          />
-          
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor="rgba(255, 255, 255, 0.6)"
-            keyboardType="email-address"
-            value={email}
-            onChangeText={setEmail}
-          />
-          
-          <TextInput
-            style={styles.input}
-            placeholder="Phone Number"
-            placeholderTextColor="rgba(255, 255, 255, 0.6)"
-            keyboardType="phone-pad"
-            value={phone}
-            onChangeText={setPhone}
-          />
-          
-          <TextInput
-            style={styles.input}
-            placeholder="Username"
-            placeholderTextColor="rgba(255, 255, 255, 0.6)"
-            value={username}
-            onChangeText={setUsername}
-          />
-          
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor="rgba(255, 255, 255, 0.6)"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
-          
-          <TextInput
-            style={styles.input}
-            placeholder="Confirm Password"
-            placeholderTextColor="rgba(255, 255, 255, 0.6)"
-            secureTextEntry
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-          />
-        </View>
+        <View style={styles.form}>
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor="#9CA3D4"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          </View>
 
-        {/* Signup Button */}
-        <TouchableOpacity style={styles.signupButton} onPress={handleSignup}>
-          <Text style={styles.signupButtonText}>Sign Up</Text>
-        </TouchableOpacity>
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor="#9CA3D4"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+          </View>
 
-        {/* Login Link */}
-        <View style={styles.loginContainer}>
-          <Text style={styles.loginText}>Already have an account?</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-            <Text style={styles.loginLink}> Log In</Text>
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder="Confirm Password"
+              placeholderTextColor="#9CA3D4"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+            />
+          </View>
+
+          {/* Sign Up Button */}
+          <TouchableOpacity style={styles.signupButton} onPress={handleSignUp}>
+            <Text style={styles.signupButtonText}>Create Account</Text>
           </TouchableOpacity>
+
+          {/* Divider */}
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>OR</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Google Sign Up */}
+          <TouchableOpacity
+            style={styles.googleButton}
+            onPress={handleGoogleSignUp}
+          >
+            <Text style={styles.googleButtonText}>🔍 Sign up with Google</Text>
+          </TouchableOpacity>
+
+          {/* Login Link */}
+          <View style={styles.loginContainer}>
+            <Text style={styles.loginText}>Already have an account? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+              <Text style={styles.loginLink}>Log In</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </ScrollView>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#9B7EDE',
+    backgroundColor: '#1a237e',
   },
-  scrollContent: {
+  content: {
+    flex: 1,
+    padding: 24,
+    justifyContent: 'center',
+  },
+  logoContainer: {
     alignItems: 'center',
-    paddingHorizontal: 30,
-    paddingBottom: 40,
+    marginBottom: 40,
   },
-  iconContainer: {
-    alignItems: 'center',
-    marginTop: 60,
-    marginBottom: 30,
-  },
-  iconBox: {
+  logo: {
     width: 80,
     height: 80,
-    backgroundColor: 'white',
     borderRadius: 20,
+    backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  iconText: {
-    fontSize: 40,
+  logoIcon: {
+    width: 50,
+    height: 50,
+    position: 'relative',
+  },
+  mapPin1: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#7c4dff',
+    position: 'absolute',
+    top: 5,
+    left: 10,
+    borderWidth: 2,
+    borderColor: '#5e35b1',
+  },
+  mapPin2: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#7c4dff',
+    position: 'absolute',
+    top: 5,
+    right: 10,
+    borderWidth: 2,
+    borderColor: '#5e35b1',
+  },
+  routeLine: {
+    width: 30,
+    height: 2,
+    backgroundColor: '#7c4dff',
+    position: 'absolute',
+    top: 30,
+    left: 10,
+    borderRadius: 1,
   },
   appName: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: 'white',
-    marginTop: 5,
+    color: '#fff',
   },
-  titleText: {
+  welcomeText: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 5,
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 8,
   },
-  subtitleText: {
+  subText: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginBottom: 30,
+    color: '#B8C1E8',
+    textAlign: 'center',
+    marginBottom: 40,
+  },
+  form: {
+    width: '100%',
   },
   inputContainer: {
-    width: '100%',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   input: {
-    width: '100%',
-    height: 55,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 15,
-    paddingHorizontal: 20,
-    marginBottom: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 12,
+    padding: 16,
     fontSize: 16,
-    color: 'white',
+    color: '#fff',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   signupButton: {
-    width: '100%',
-    height: 55,
-    backgroundColor: 'white',
-    borderRadius: 30,
-    justifyContent: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
     alignItems: 'center',
     marginBottom: 20,
+    marginTop: 8,
   },
   signupButtonText: {
+    color: '#1a237e',
     fontSize: 18,
+    fontWeight: 'bold',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  dividerText: {
+    color: '#B8C1E8',
+    paddingHorizontal: 10,
+    fontSize: 14,
+  },
+  googleButton: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  googleButtonText: {
+    color: '#1a237e',
+    fontSize: 16,
     fontWeight: '600',
-    color: '#9B7EDE',
   },
   loginContainer: {
     flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
   },
   loginText: {
-    color: 'white',
+    color: '#B8C1E8',
     fontSize: 14,
   },
   loginLink: {
-    color: 'white',
+    color: '#fff',
     fontSize: 14,
     fontWeight: 'bold',
-    textDecorationLine: 'underline',
   },
 });
 
-export default SignupScreen;
+export default SignUpScreen;
