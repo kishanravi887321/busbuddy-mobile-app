@@ -33,6 +33,7 @@ const TrackMap = () => {
           name: 'Live Tracking',        // channel name
           description: 'Tracks location in real-time', // optional
           enableVibration: false,       // optional
+          importance: 3,                // IMPORTANCE_DEFAULT
         });
       } catch (err) {
         console.error('Failed to create notification channel:', err);
@@ -55,7 +56,7 @@ const TrackMap = () => {
         id: 144,
         title: 'Live Tracking Active',
         text: 'Your location is being tracked',
-        icon: 'ic_icon', // make sure this drawable exists in android/app/src/main/res/drawable
+        icon: 'ic_notification', // notification icon from android/app/src/main/res/drawable
       });
     } catch (err) {
       console.error('Failed to start foreground service:', err);
@@ -132,6 +133,7 @@ const TrackMap = () => {
     </View>
   );
 };
+
 
 export default TrackMap;
 
