@@ -2,6 +2,9 @@ import React from 'react';
 import { StatusBar } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import {enanbleScreens} from 'react-native-screens';
+
+enanbleScreens(); 
 
 // Import Root Navigator
 import { RootNavigator } from './src/navigation';
