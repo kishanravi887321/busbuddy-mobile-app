@@ -1,4 +1,12 @@
 rootProject.name = 'busbuddy'
-apply from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesSettingsGradle(settings)
+
+apply from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle");
+applyNativeModulesSettingsGradle(settings)
+
 include ':app'
+
+// Removed manual inclusion - autolinking handles it
+// include ':@voximplant_react-native-foreground-service'
+// project(':@voximplant_react-native-foreground-service').projectDir = new File(rootProject.projectDir, '../node_modules/@voximplant/react-native-foreground-service/android')
+
 includeBuild('../node_modules/@react-native/gradle-plugin')
