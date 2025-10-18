@@ -15,16 +15,26 @@ import {
 } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import VIForegroundService from '@voximplant/react-native-foreground-service';
+import io from 'socket.io-client';
+
+// Socket.IO Configuration (Testing)
+const SOCKET_URL = 'https://where-is-mybus.onrender.com';
+const TEST_BUS_ID = 'BUS111';
+const TEST_TOKEN = '1234';
 
 const TrackMap = () => {
   const [location, setLocation] = useState(null);
+  
   const [isTracking, setIsTracking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [trackingStartTime, setTrackingStartTime] = useState(null);
   const [totalDistance, setTotalDistance] = useState(0);
+  const [socketConnected, setSocketConnected] = useState(false);
+  const [socketError, setSocketError] = useState(null);
   const watchId = useRef(null);
   const notificationIntervalId = useRef(null);
+  const socketRef = useRef(null);
   const lastPosition = useRef(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -95,6 +105,89 @@ const TrackMap = () => {
     return true; // iOS handles permissions via Info.plist
   };
 
+  // Initialize Socket.IO connection
+  useEffect(() => {
+    console.log('🔌 Initializing Socket.IO connection...');
+    
+    // Create socket connection
+    socketRef.current = io(SOCKET_URL, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 5,
+    });
+
+    // Connection event handlers
+    socketRef.current.on('connect', () => {
+      console.log('✅ Socket.IO connected:', socketRef.current.id);
+      setSocketConnected(true);
+      setSocketError(null);
+      
+      // Identify as driver
+      console.log('👤 Identifying as driver...');
+      socketRef.current.emit('identify', {
+        type: 'driver',
+        token: TEST_TOKEN,
+        busId: TEST_BUS_ID
+      });
+    });
+
+    socketRef.current.on('identify:success', (data) => {
+      console.log('✅ Identified successfully:', data);
+      
+      // Join bus room
+      console.log('🚌 Joining bus room...');
+      socketRef.current.emit('driver:join', {
+        busId: TEST_BUS_ID,
+        driverInfo: {
+          name: 'Test Driver',
+          phone: '+91-1234567890'
+        }
+      });
+    });
+
+    socketRef.current.on('identify:error', (error) => {
+      console.error('❌ Identify error:', error);
+      setSocketError(`Identify failed: ${error.message || error}`);
+    });
+
+    socketRef.current.on('driver:joined', (data) => {
+      console.log('✅ Driver joined bus successfully:', data);
+    });
+
+    socketRef.current.on('driver:error', (error) => {
+      console.error('❌ Driver error:', error);
+      setSocketError(`Driver error: ${error.message || error}`);
+    });
+
+    socketRef.current.on('driver:location:sent', (data) => {
+      console.log('✅ Location sent to server:', data);
+    });
+
+    socketRef.current.on('disconnect', (reason) => {
+      console.log('🔌 Socket disconnected:', reason);
+      setSocketConnected(false);
+    });
+
+    socketRef.current.on('error', (error) => {
+      console.error('❌ Socket error:', error);
+      setSocketError(`Socket error: ${error.message || error}`);
+    });
+
+    socketRef.current.on('connect_error', (error) => {
+      console.error('❌ Connection error:', error.message);
+      setSocketError(`Connection error: ${error.message}`);
+    });
+
+    // Cleanup on unmount
+    return () => {
+      if (socketRef.current) {
+        console.log('🔌 Disconnecting socket...');
+        socketRef.current.disconnect();
+      }
+    };
+  }, []);
+
   // Create notification channel (required on Android 8+)
   useEffect(() => {
     const createChannel = async () => {
@@ -162,6 +255,33 @@ const TrackMap = () => {
       Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c; // Distance in km
+  };
+
+  // Send location to Socket.IO server
+  const sendLocationToServer = (locationData) => {
+    if (!socketRef.current || !socketConnected) {
+      console.warn('⚠️ Socket not connected, skipping location send');
+      return;
+    }
+
+    try {
+      const payload = {
+        busId: TEST_BUS_ID,
+        location: {
+          latitude: locationData.latitude,
+          longitude: locationData.longitude
+        },
+        speed: parseFloat(locationData.speed) || 0,
+        heading: 0, // You can add compass heading if needed
+        timestamp: new Date().toISOString()
+      };
+
+      socketRef.current.emit('driver:location', payload);
+      console.log('📡 Location emitted to server:', payload);
+    } catch (error) {
+      console.error('❌ Failed to send location:', error);
+      setSocketError(`Send location error: ${error.message}`);
+    }
   };
 
   // Update notification with current state
@@ -251,12 +371,19 @@ const TrackMap = () => {
         
         lastPosition.current = { latitude, longitude };
         
-        setLocation({ 
+        const locationData = { 
           latitude, 
           longitude, 
           accuracy: accuracy || null, // Store raw number or null
           speed: speed ? (speed * 3.6).toFixed(2) : '0'
-        });
+        };
+        
+        setLocation(locationData);
+        
+        // Send location to Socket.IO server
+        if (!isPaused) {
+          sendLocationToServer(locationData);
+        }
         
         // Update notification with live data
         if (!isPaused) {
@@ -361,6 +488,21 @@ const TrackMap = () => {
         <Text style={styles.headerSubtitle}>Live Location Tracker</Text>
       </View>
 
+      {/* Socket Status Indicator */}
+      <View style={styles.socketStatus}>
+        <View style={[styles.socketDot, { backgroundColor: socketConnected ? '#10B981' : '#EF4444' }]} />
+        <Text style={styles.socketText}>
+          {socketConnected ? '🔌 Server Connected' : '🔌 Server Disconnected'}
+        </Text>
+      </View>
+
+      {/* Socket Error Display */}
+      {socketError && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>⚠️ {socketError}</Text>
+        </View>
+      )}
+
       {/* Status Indicator */}
       <View style={styles.statusContainer}>
         <Animated.View 
@@ -373,7 +515,7 @@ const TrackMap = () => {
           ]} 
         />
         <Text style={styles.statusText}>
-          {isTracking ? (isPaused ? '� Tracking Paused' : '�🟢 Tracking Active') : '⚫ Tracking Inactive'}
+          {isTracking ? (isPaused ? '🟡 Tracking Paused' : '� Tracking Active') : '⚫ Tracking Inactive'}
         </Text>
       </View>
 
@@ -569,6 +711,45 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
     color: '#6B7280',
+    fontWeight: '500',
+  },
+  socketStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  socketDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  socketText: {
+    fontSize: 12,
+    color: '#4B5563',
+    fontWeight: '600',
+  },
+  errorContainer: {
+    backgroundColor: '#FEE2E2',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#EF4444',
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#991B1B',
     fontWeight: '500',
   },
   statusContainer: {
