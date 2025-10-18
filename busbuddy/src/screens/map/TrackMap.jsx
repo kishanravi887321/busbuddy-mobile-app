@@ -1,58 +1,68 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, Button, Platform } from 'react-native';
-import BackgroundGeolocation from "react-native-background-geolocation";
+import React, { useState, useRef } from 'react';
+import { StyleSheet, Text, View, Button, Platform, PermissionsAndroid } from 'react-native';
+import Geolocation from '@react-native-community/geolocation';
+import ForegroundService from '@supersami/rn-foreground-service';
 
 const TrackMap = () => {
   const [location, setLocation] = useState(null);
   const [isTracking, setIsTracking] = useState(false);
+  const watchId = useRef(null);
 
-  useEffect(() => {
-    // Configure the plugin
-    BackgroundGeolocation.ready({
-      desiredAccuracy: BackgroundGeolocation.DESIRED_ACCURACY_HIGH,
-      distanceFilter: 0,
-      stopOnTerminate: false,   // keep tracking after app closed
-      startOnBoot: true,        // restart tracking after reboot
-      interval: 1000,
-      fastestInterval: 1000,
-      notificationsEnabled: true,
-      foregroundService: true,
-      notification: {
-        title: "Live Tracking Active",
-        text: "Your location is being tracked",
-        color: "#0000FF",
-      },
-    }, state => {
-      console.log("BackgroundGeolocation ready:", state.enabled);
+  // Request permission for Android
+  const requestPermission = async () => {
+    if (Platform.OS === 'android') {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        {
+          title: 'Location Permission',
+          message: 'App needs access to your location for live tracking.',
+          buttonPositive: 'OK',
+        },
+      );
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    }
+    return true;
+  };
+
+  const startTracking = async () => {
+    const hasPermission = await requestPermission();
+    if (!hasPermission) return;
+
+    // Start foreground service with notification
+    ForegroundService.start({
+      id: 144,
+      title: 'Live Tracking Active',
+      message: 'Your location is being tracked',
+      importance: 'high'
     });
 
-    // Listen to location updates
-    BackgroundGeolocation.onLocation(
-      location => {
-        const { latitude, longitude } = location.coords;
+    watchId.current = Geolocation.watchPosition(
+      position => {
+        const { latitude, longitude } = position.coords;
         setLocation({ latitude, longitude });
       },
-      error => {
-        console.log("Location error:", error);
+      error => console.log('Location error:', error),
+      {
+        enableHighAccuracy: true,
+        distanceFilter: 0,
+        interval: 1000,
+        fastestInterval: 1000,
+        maximumAge: 0
       }
     );
 
-    // Cleanup on unmount
-    return () => {
-      BackgroundGeolocation.removeAllListeners();
-    };
-  }, []);
-
-  const startTracking = () => {
-    BackgroundGeolocation.start();
     setIsTracking(true);
-    console.log("Tracking started");
+    console.log('Tracking started');
   };
 
   const stopTracking = () => {
-    BackgroundGeolocation.stop();
+    if (watchId.current !== null) {
+      Geolocation.clearWatch(watchId.current);
+      watchId.current = null;
+    }
+    ForegroundService.stop();
     setIsTracking(false);
-    console.log("Tracking stopped");
+    console.log('Tracking stopped');
   };
 
   return (
@@ -93,31 +103,9 @@ const TrackMap = () => {
 export default TrackMap;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    justifyContent: 'center',
-    backgroundColor: '#f9f9f9',
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 30,
-  },
-  btnContainer: {
-    marginVertical: 10,
-  },
-  box: {
-    marginTop: 40,
-    padding: 20,
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    elevation: 3,
-  },
-  coordText: {
-    fontSize: 18,
-    textAlign: 'center',
-    color:"black"
-  },
+  container: { flex: 1, padding: 20, justifyContent: 'center', backgroundColor: '#f9f9f9' },
+  title: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginBottom: 30 },
+  btnContainer: { marginVertical: 10 },
+  box: { marginTop: 40, padding: 20, borderRadius: 12, backgroundColor: '#fff', elevation: 3 },
+  coordText: { fontSize: 18, textAlign: 'center', color: 'black' }
 });
