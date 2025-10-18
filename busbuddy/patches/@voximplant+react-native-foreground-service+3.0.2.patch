@@ -145,10 +145,6 @@ index 0000000..1bcd4b7
 +  "elementType": "File"
 +}
 \ No newline at end of file
-diff --git a/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/aar_main_jar/debug/classes.jar b/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/aar_main_jar/debug/classes.jar
-new file mode 100644
-index 0000000..0a1eaf6
-Binary files /dev/null and b/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/aar_main_jar/debug/classes.jar differ
 diff --git a/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/aar_metadata/debug/aar-metadata.properties b/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/aar_metadata/debug/aar-metadata.properties
 new file mode 100644
 index 0000000..776557e
@@ -168,9 +164,6 @@ index 0000000..9e26dfe
 @@ -0,0 +1 @@
 +{}
 \ No newline at end of file
-diff --git a/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/annotations_typedef_file/debug/typedefs.txt b/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/annotations_typedef_file/debug/typedefs.txt
-new file mode 100644
-index 0000000..e69de29
 diff --git a/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/compile_library_classes_jar/debug/classes.jar b/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/compile_library_classes_jar/debug/classes.jar
 new file mode 100644
 index 0000000..ab7e083
@@ -182,17 +175,13 @@ Binary files /dev/null and b/node_modules/@voximplant/react-native-foreground-se
 diff --git a/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/compile_symbol_list/debug/R.txt b/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/compile_symbol_list/debug/R.txt
 new file mode 100644
 index 0000000..e69de29
-diff --git a/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/incremental/debug-mergeJavaRes/merge-state b/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/incremental/debug-mergeJavaRes/merge-state
-new file mode 100644
-index 0000000..1c983fc
-Binary files /dev/null and b/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/incremental/debug-mergeJavaRes/merge-state differ
 diff --git a/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties b/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties
 new file mode 100644
-index 0000000..b3744b8
+index 0000000..60cd993
 --- /dev/null
 +++ b/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties
 @@ -0,0 +1 @@
-+#Sun Oct 19 00:22:31 IST 2025
++#Sun Oct 19 00:46:02 IST 2025
 diff --git a/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/incremental/debug/packageDebugResources/merger.xml b/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/incremental/debug/packageDebugResources/merger.xml
 new file mode 100644
 index 0000000..ba18dc3
@@ -278,10 +267,6 @@ index 0000000..d9e64e5
 +5    <uses-sdk android:minSdkVersion="21" />
 +6
 +7</manifest>
-diff --git a/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/merged_java_res/debug/feature-voximplant_react-native-foreground-service.jar b/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/merged_java_res/debug/feature-voximplant_react-native-foreground-service.jar
-new file mode 100644
-index 0000000..15cb0ec
-Binary files /dev/null and b/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/merged_java_res/debug/feature-voximplant_react-native-foreground-service.jar differ
 diff --git a/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/merged_manifest/debug/AndroidManifest.xml b/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/merged_manifest/debug/AndroidManifest.xml
 new file mode 100644
 index 0000000..75dc8db
@@ -315,10 +300,6 @@ index 0000000..3c2eb6d
 +++ b/node_modules/@voximplant/react-native-foreground-service/android/build/intermediates/symbol_list_with_package_name/debug/package-aware-r.txt
 @@ -0,0 +1 @@
 +com.voximplant.foregroundservice
-diff --git a/node_modules/@voximplant/react-native-foreground-service/android/build/outputs/aar/voximplant_react-native-foreground-service-debug.aar b/node_modules/@voximplant/react-native-foreground-service/android/build/outputs/aar/voximplant_react-native-foreground-service-debug.aar
-new file mode 100644
-index 0000000..57665dc
-Binary files /dev/null and b/node_modules/@voximplant/react-native-foreground-service/android/build/outputs/aar/voximplant_react-native-foreground-service-debug.aar differ
 diff --git a/node_modules/@voximplant/react-native-foreground-service/android/build/outputs/logs/manifest-merger-debug-report.txt b/node_modules/@voximplant/react-native-foreground-service/android/build/outputs/logs/manifest-merger-debug-report.txt
 new file mode 100644
 index 0000000..87d526a

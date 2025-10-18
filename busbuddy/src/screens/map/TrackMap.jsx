@@ -9,7 +9,8 @@ import {
   Alert,
   Animated,
   ActivityIndicator,
-  Linking 
+  Linking,
+  ScrollView 
 } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import VIForegroundService from '@voximplant/react-native-foreground-service';
@@ -17,8 +18,12 @@ import VIForegroundService from '@voximplant/react-native-foreground-service';
 const TrackMap = () => {
   const [location, setLocation] = useState(null);
   const [isTracking, setIsTracking] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [trackingStartTime, setTrackingStartTime] = useState(null);
+  const [totalDistance, setTotalDistance] = useState(0);
   const watchId = useRef(null);
+  const lastPosition = useRef(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Open app settings
@@ -114,7 +119,7 @@ const TrackMap = () => {
 
   // Pulse animation effect
   useEffect(() => {
-    if (isTracking) {
+    if (isTracking && !isPaused) {
       const pulse = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
@@ -132,7 +137,46 @@ const TrackMap = () => {
       pulse.start();
       return () => pulse.stop();
     }
-  }, [isTracking]);
+  }, [isTracking, isPaused]);
+
+  // Calculate distance between two coordinates (Haversine formula)
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // Distance in km
+  };
+
+  // Update notification with current state
+  const updateNotification = async (paused = false) => {
+    try {
+      const elapsedTime = trackingStartTime 
+        ? Math.floor((Date.now() - trackingStartTime) / 1000 / 60) 
+        : 0;
+
+      await VIForegroundService.getInstance().startService({
+        channelId: 'live_tracking',
+        id: 144,
+        title: paused 
+          ? '⏸️ BusBuddy - Tracking Paused' 
+          : '🚍 BusBuddy - Live Tracking Active',
+        text: paused
+          ? `Tracking paused | ${totalDistance.toFixed(2)} km tracked`
+          : `${elapsedTime} min • ${totalDistance.toFixed(2)} km • ${location?.speed || 0} km/h`,
+        icon: 'ic_notification',
+        priority: 2,
+        button: paused ? 'Resume' : 'Pause',
+        ongoing: true, // Makes notification non-dismissible (can't swipe away)
+      });
+    } catch (err) {
+      console.error('Failed to update notification:', err);
+    }
+  };
 
   const startTracking = async () => {
     setIsLoading(true);
@@ -146,13 +190,19 @@ const TrackMap = () => {
 
     // Start foreground service with enhanced notification
     try {
+      setTrackingStartTime(Date.now());
+      setTotalDistance(0);
+      lastPosition.current = null;
+
       await VIForegroundService.getInstance().startService({
         channelId: 'live_tracking',
         id: 144,
         title: '🚍 BusBuddy - Live Tracking Active',
-        text: 'Your location is being tracked continuously',
+        text: 'Initializing GPS location...',
         icon: 'ic_notification',
-        priority: 2, // PRIORITY_MAX
+        priority: 2,
+        button: 'Pause',
+        ongoing: true, // Non-dismissible notification
       });
       console.log('✅ Foreground service started');
     } catch (err) {
@@ -166,12 +216,32 @@ const TrackMap = () => {
     watchId.current = Geolocation.watchPosition(
       position => {
         const { latitude, longitude, accuracy, speed } = position.coords;
+        
+        // Calculate distance if we have a previous position
+        if (lastPosition.current && !isPaused) {
+          const distance = calculateDistance(
+            lastPosition.current.latitude,
+            lastPosition.current.longitude,
+            latitude,
+            longitude
+          );
+          setTotalDistance(prev => prev + distance);
+        }
+        
+        lastPosition.current = { latitude, longitude };
+        
         setLocation({ 
           latitude, 
           longitude, 
           accuracy: accuracy ? accuracy.toFixed(2) : 'N/A',
-          speed: speed ? (speed * 3.6).toFixed(2) : '0' // Convert m/s to km/h
+          speed: speed ? (speed * 3.6).toFixed(2) : '0'
         });
+        
+        // Update notification with live data
+        if (!isPaused) {
+          updateNotification(false);
+        }
+        
         console.log(`📍 Location updated: ${latitude}, ${longitude}`);
       },
       error => {
@@ -180,17 +250,30 @@ const TrackMap = () => {
       },
       {
         enableHighAccuracy: true,
-        distanceFilter: 10, // Update every 10 meters
-        interval: 5000, // Update every 5 seconds
-        fastestInterval: 3000,
+        distanceFilter: 10,
+        interval: 3000, // Update every 3 seconds (faster notification refresh)
+        fastestInterval: 2000,
         maximumAge: 0,
       }
     );
 
     setIsTracking(true);
+    setIsPaused(false);
     setIsLoading(false);
     console.log('✅ Tracking started successfully');
     Alert.alert('Tracking Started', 'Location tracking is now active. You can minimize the app.');
+  };
+
+  const pauseTracking = () => {
+    setIsPaused(true);
+    updateNotification(true);
+    console.log('⏸️ Tracking paused');
+  };
+
+  const resumeTracking = () => {
+    setIsPaused(false);
+    updateNotification(false);
+    console.log('▶️ Tracking resumed');
   };
 
   const stopTracking = async () => {
@@ -210,14 +293,31 @@ const TrackMap = () => {
     }
 
     setIsTracking(false);
+    setIsPaused(false);
     setIsLoading(false);
+    setTrackingStartTime(null);
     setLocation(null);
+    lastPosition.current = null;
     console.log('⏹️ Tracking stopped');
-    Alert.alert('Tracking Stopped', 'Location tracking has been stopped.');
+    
+    const finalDistance = totalDistance.toFixed(2);
+    Alert.alert(
+      'Tracking Stopped', 
+      `Total distance tracked: ${finalDistance} km`
+    );
+  };
+
+  // Format elapsed time
+  const getElapsedTime = () => {
+    if (!trackingStartTime) return '0:00';
+    const elapsed = Math.floor((Date.now() - trackingStartTime) / 1000);
+    const minutes = Math.floor(elapsed / 60);
+    const seconds = elapsed % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>🚍 BusBuddy</Text>
@@ -230,15 +330,46 @@ const TrackMap = () => {
           style={[
             styles.statusIndicator, 
             { 
-              backgroundColor: isTracking ? '#10B981' : '#6B7280',
-              transform: [{ scale: isTracking ? pulseAnim : 1 }]
+              backgroundColor: isTracking ? (isPaused ? '#F59E0B' : '#10B981') : '#6B7280',
+              transform: [{ scale: isTracking && !isPaused ? pulseAnim : 1 }]
             }
           ]} 
         />
         <Text style={styles.statusText}>
-          {isTracking ? '🟢 Tracking Active' : '⚫ Tracking Inactive'}
+          {isTracking ? (isPaused ? '� Tracking Paused' : '�🟢 Tracking Active') : '⚫ Tracking Inactive'}
         </Text>
       </View>
+
+      {/* Tracking Stats - Show when tracking */}
+      {isTracking && (
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.statsScrollContainer}
+          contentContainerStyle={styles.statsContainer}
+        >
+          <View style={styles.statCard}>
+            <Text style={styles.statIcon}>⏱️</Text>
+            <Text style={styles.statValue}>{getElapsedTime()}</Text>
+            <Text style={styles.statLabel}>Duration</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statIcon}>📏</Text>
+            <Text style={styles.statValue}>{totalDistance.toFixed(2)}</Text>
+            <Text style={styles.statLabel}>km</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statIcon}>🚀</Text>
+            <Text style={styles.statValue}>{location?.speed || '0'}</Text>
+            <Text style={styles.statLabel}>km/h</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statIcon}>📍</Text>
+            <Text style={styles.statValue}>{location?.accuracy || 'N/A'}</Text>
+            <Text style={styles.statLabel}>Accuracy</Text>
+          </View>
+        </ScrollView>
+      )}
 
       {/* Location Info Card */}
       <View style={styles.card}>
@@ -279,25 +410,40 @@ const TrackMap = () => {
 
       {/* Control Buttons */}
       <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={[styles.button, styles.startButton, isTracking && styles.buttonDisabled]}
-          onPress={startTracking}
-          disabled={isTracking || isLoading}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.buttonText}>
-            {isTracking ? '✅ Tracking...' : '▶️ Start Live Tracking'}
-          </Text>
-        </TouchableOpacity>
+        {!isTracking ? (
+          <TouchableOpacity
+            style={[styles.button, styles.startButton]}
+            onPress={startTracking}
+            disabled={isLoading}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.buttonText}>
+              {isLoading ? '⏳ Starting...' : '▶️ Start Live Tracking'}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <>
+            <TouchableOpacity
+              style={[styles.button, isPaused ? styles.resumeButton : styles.pauseButton]}
+              onPress={isPaused ? resumeTracking : pauseTracking}
+              disabled={isLoading}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.buttonText}>
+                {isPaused ? '▶️ Resume Tracking' : '⏸️ Pause Tracking'}
+              </Text>
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.button, styles.stopButton, !isTracking && styles.buttonDisabled]}
-          onPress={stopTracking}
-          disabled={!isTracking || isLoading}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.buttonText}>⏹️ Stop Tracking</Text>
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, styles.stopButton]}
+              onPress={stopTracking}
+              disabled={isLoading}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.buttonText}>⏹️ Stop Tracking</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       {/* Info Banner */}
@@ -309,7 +455,34 @@ const TrackMap = () => {
           </Text>
         </View>
       )}
-    </View>
+
+      {/* Settings Helper */}
+      {!isTracking && (
+        <TouchableOpacity 
+          style={styles.settingsButton} 
+          onPress={() => {
+            Alert.alert(
+              '📱 Enable Notifications',
+              'If you don\'t see the notification when tracking:\n\n' +
+              '1. Go to Phone Settings\n' +
+              '2. Find Apps → busbuddy\n' +
+              '3. Enable Notifications\n' +
+              '4. Enable "live_tracking" channel\n\n' +
+              'Tap "Open Settings" to go there now.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Open Settings', onPress: openAppSettings }
+              ]
+            );
+          }}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.settingsButtonText}>
+            ⚙️ Need help with notifications?
+          </Text>
+        </TouchableOpacity>
+      )}
+    </ScrollView>
   );
 };
 
@@ -320,21 +493,24 @@ const styles = StyleSheet.create({
   container: { 
     flex: 1, 
     backgroundColor: '#F3F4F6',
+  },
+  scrollContent: {
     padding: 20,
+    paddingBottom: 40,
   },
   header: {
-    marginTop: 20,
-    marginBottom: 30,
+    marginTop: 10,
+    marginBottom: 20,
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#1F2937',
     marginBottom: 5,
   },
   headerSubtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#6B7280',
     fontWeight: '500',
   },
@@ -342,9 +518,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 25,
-    paddingVertical: 15,
-    paddingHorizontal: 25,
+    marginBottom: 15,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     backgroundColor: '#FFFFFF',
     borderRadius: 50,
     elevation: 3,
@@ -354,90 +530,123 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   statusIndicator: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    marginRight: 12,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 10,
   },
   statusText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#1F2937',
   },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 25,
-    marginBottom: 25,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
+  statsContainer: {
+    marginBottom: 15,
+    height: 100,
   },
-  cardTitle: {
-    fontSize: 20,
+  statCard: {
+    width: 110,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 10,
+    marginRight: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  statIcon: {
+    fontSize: 18,
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#1F2937',
-    marginBottom: 20,
+    marginBottom: 2,
+  },
+  statLabel: {
+    fontSize: 9,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 15,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 5,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 15,
   },
   loadingContainer: {
     alignItems: 'center',
-    paddingVertical: 30,
+    paddingVertical: 25,
   },
   loadingText: {
-    marginTop: 15,
-    fontSize: 16,
+    marginTop: 12,
+    fontSize: 14,
     color: '#6B7280',
     fontWeight: '500',
   },
   locationInfo: {
-    gap: 15,
+    gap: 12,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
   infoLabel: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#6B7280',
     fontWeight: '500',
   },
   infoValue: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#1F2937',
     fontWeight: '600',
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 30,
   },
   emptyIcon: {
-    fontSize: 60,
-    marginBottom: 15,
+    fontSize: 50,
+    marginBottom: 12,
   },
   emptyText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   emptyHint: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#9CA3AF',
   },
   buttonContainer: {
-    gap: 15,
-    marginBottom: 20,
+    gap: 12,
+    marginBottom: 15,
   },
   button: {
-    paddingVertical: 18,
-    borderRadius: 15,
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 3,
@@ -448,6 +657,12 @@ const styles = StyleSheet.create({
   },
   startButton: {
     backgroundColor: '#10B981',
+  },
+  pauseButton: {
+    backgroundColor: '#F59E0B',
+  },
+  resumeButton: {
+    backgroundColor: '#3B82F6',
   },
   stopButton: {
     backgroundColor: '#EF4444',
@@ -480,5 +695,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#1E40AF',
     lineHeight: 18,
+  },
+  settingsButton: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    padding: 15,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+  },
+  settingsButtonText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '600',
   },
 });
