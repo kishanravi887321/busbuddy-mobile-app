@@ -1,6 +1,12 @@
 package com.busbuddy
 
 import android.app.Application
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.BroadcastReceiver
+import android.os.Build
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
@@ -41,5 +47,45 @@ class MainApplication : Application(), ReactApplication {
       load()
     }
     ReactNativeFlipper.initializeFlipper(this, reactNativeHost.reactInstanceManager)
+  }
+  
+  /**
+   * Override registerReceiver to handle Android 14+ requirements
+   */
+  override fun registerReceiver(receiver: BroadcastReceiver?, filter: IntentFilter?): Intent? {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && receiver != null && filter != null) {
+      super.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+    } else {
+      super.registerReceiver(receiver, filter)
+    }
+  }
+
+  override fun registerReceiver(
+    receiver: BroadcastReceiver?,
+    filter: IntentFilter?,
+    flags: Int
+  ): Intent? {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && receiver != null && filter != null) {
+      var newFlags = flags
+      if (flags != Context.RECEIVER_EXPORTED && flags != Context.RECEIVER_NOT_EXPORTED) {
+        newFlags = flags or Context.RECEIVER_NOT_EXPORTED
+      }
+      super.registerReceiver(receiver, filter, newFlags)
+    } else {
+      super.registerReceiver(receiver, filter, flags)
+    }
+  }
+
+  override fun registerReceiver(
+    receiver: BroadcastReceiver?,
+    filter: IntentFilter?,
+    broadcastPermission: String?,
+    scheduler: android.os.Handler?
+  ): Intent? {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && receiver != null && filter != null) {
+      super.registerReceiver(receiver, filter, broadcastPermission, scheduler, Context.RECEIVER_NOT_EXPORTED)
+    } else {
+      super.registerReceiver(receiver, filter, broadcastPermission, scheduler)
+    }
   }
 }

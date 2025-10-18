@@ -9,6 +9,9 @@
     
     <!-- Required for Android 10+ (Q) and above for background access -->
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    
+    <!-- Required for Android 13+ (TIRAMISU) to show notifications -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
       android:name=".MainApplication"
