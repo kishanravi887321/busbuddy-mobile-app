@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
-import { StyleSheet, Text, View, Button, Platform, PermissionsAndroid } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { StyleSheet, Text, View, Button, Platform, PermissionsAndroid, Alert } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
-import ForegroundService from '@supersami/rn-foreground-service';
+import VIForegroundService from '@voximplant/react-native-foreground-service';
 
 const TrackMap = () => {
   const [location, setLocation] = useState(null);
@@ -21,21 +21,48 @@ const TrackMap = () => {
       );
       return granted === PermissionsAndroid.RESULTS.GRANTED;
     }
-    return true;
+    return true; // iOS will handle location permission via Info.plist
   };
+
+  // Create notification channel (required on Android 8+)
+  useEffect(() => {
+    const createChannel = async () => {
+      try {
+        await VIForegroundService.getInstance().createNotificationChannel({
+          id: 'live_tracking',          // unique channel id
+          name: 'Live Tracking',        // channel name
+          description: 'Tracks location in real-time', // optional
+          enableVibration: false,       // optional
+        });
+      } catch (err) {
+        console.error('Failed to create notification channel:', err);
+      }
+    };
+    createChannel();
+  }, []);
 
   const startTracking = async () => {
     const hasPermission = await requestPermission();
-    if (!hasPermission) return;
+    if (!hasPermission) {
+      Alert.alert('Permission Denied', 'Cannot start tracking without location permission.');
+      return;
+    }
 
-    // Start foreground service with notification
-    ForegroundService.start({
-      id: 144,
-      title: 'Live Tracking Active',
-      message: 'Your location is being tracked',
-      importance: 'high'
-    });
+    // Start foreground service
+    try {
+      await VIForegroundService.getInstance().startService({
+        channelId: 'live_tracking',
+        id: 144,
+        title: 'Live Tracking Active',
+        text: 'Your location is being tracked',
+        icon: 'ic_icon', // make sure this drawable exists in android/app/src/main/res/drawable
+      });
+    } catch (err) {
+      console.error('Failed to start foreground service:', err);
+      return;
+    }
 
+    // Start watching location
     watchId.current = Geolocation.watchPosition(
       position => {
         const { latitude, longitude } = position.coords;
@@ -47,7 +74,7 @@ const TrackMap = () => {
         distanceFilter: 0,
         interval: 1000,
         fastestInterval: 1000,
-        maximumAge: 0
+        maximumAge: 0,
       }
     );
 
@@ -55,12 +82,18 @@ const TrackMap = () => {
     console.log('Tracking started');
   };
 
-  const stopTracking = () => {
+  const stopTracking = async () => {
     if (watchId.current !== null) {
       Geolocation.clearWatch(watchId.current);
       watchId.current = null;
     }
-    ForegroundService.stop();
+
+    try {
+      await VIForegroundService.getInstance().stopService();
+    } catch (err) {
+      console.error('Failed to stop foreground service:', err);
+    }
+
     setIsTracking(false);
     console.log('Tracking stopped');
   };
@@ -107,5 +140,5 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginBottom: 30 },
   btnContainer: { marginVertical: 10 },
   box: { marginTop: 40, padding: 20, borderRadius: 12, backgroundColor: '#fff', elevation: 3 },
-  coordText: { fontSize: 18, textAlign: 'center', color: 'black' }
+  coordText: { fontSize: 18, textAlign: 'center', color: 'black' },
 });

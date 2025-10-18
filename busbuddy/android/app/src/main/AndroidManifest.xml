@@ -2,11 +2,10 @@
 
     <!-- Network and Location Permissions -->
     <uses-permission android:name="android.permission.INTERNET"/>
-<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-
-
-
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    
     <!-- Required for Android 10+ (Q) and above for background access -->
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 
@@ -17,6 +16,12 @@
       android:roundIcon="@mipmap/ic_launcher_round"
       android:allowBackup="false"
       android:theme="@style/AppTheme">
+
+      <!-- Foreground Service -->
+      <service
+        android:name="com.voximplant.foregroundservice.VIForegroundService"
+        android:exported="false"
+        android:foregroundServiceType="location" />
 
       <activity
         android:name=".MainActivity"
