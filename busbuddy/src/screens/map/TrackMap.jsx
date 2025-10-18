@@ -10,7 +10,8 @@ import {
   Animated,
   ActivityIndicator,
   Linking,
-  ScrollView 
+  ScrollView,
+  AppState 
 } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import VIForegroundService from '@voximplant/react-native-foreground-service';
@@ -23,6 +24,7 @@ const TrackMap = () => {
   const [trackingStartTime, setTrackingStartTime] = useState(null);
   const [totalDistance, setTotalDistance] = useState(0);
   const watchId = useRef(null);
+  const notificationIntervalId = useRef(null);
   const lastPosition = useRef(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -111,11 +113,21 @@ const TrackMap = () => {
     };
     createChannel();
 
+    // Monitor app state for background/foreground changes
+    const appStateSubscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'background' && isTracking && !isPaused) {
+        console.log('📱 App minimized - GPS tracking continues in background via foreground service');
+      } else if (nextAppState === 'active' && isTracking) {
+        console.log('📱 App resumed - GPS tracking active');
+      }
+    });
+
     // Start pulse animation for tracking indicator
     return () => {
       pulseAnim.setValue(1);
+      appStateSubscription?.remove();
     };
-  }, []);
+  }, [isTracking, isPaused]);
 
   // Pulse animation effect
   useEffect(() => {
@@ -159,12 +171,19 @@ const TrackMap = () => {
         ? Math.floor((Date.now() - trackingStartTime) / 1000 / 60) 
         : 0;
 
+      const currentTime = new Date().toLocaleTimeString('en-US', { 
+        hour12: false, 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit' 
+      });
+
       await VIForegroundService.getInstance().startService({
         channelId: 'live_tracking',
         id: 144,
         title: paused 
           ? '⏸️ BusBuddy - Tracking Paused' 
-          : '🚍 BusBuddy - Live Tracking Active',
+          : `🚍 BusBuddy - Live Tracking [${currentTime}]`,
         text: paused
           ? `Tracking paused | ${totalDistance.toFixed(2)} km tracked`
           : `${elapsedTime} min • ${totalDistance.toFixed(2)} km • ${location?.speed || 0} km/h`,
@@ -173,6 +192,8 @@ const TrackMap = () => {
         button: paused ? 'Resume' : 'Pause',
         ongoing: true, // Makes notification non-dismissible (can't swipe away)
       });
+      
+      console.log(`🔔 Notification updated at ${currentTime}`);
     } catch (err) {
       console.error('Failed to update notification:', err);
     }
@@ -233,7 +254,7 @@ const TrackMap = () => {
         setLocation({ 
           latitude, 
           longitude, 
-          accuracy: accuracy ? accuracy.toFixed(2) : 'N/A',
+          accuracy: accuracy || null, // Store raw number or null
           speed: speed ? (speed * 3.6).toFixed(2) : '0'
         });
         
@@ -242,20 +263,29 @@ const TrackMap = () => {
           updateNotification(false);
         }
         
-        console.log(`📍 Location updated: ${latitude}, ${longitude}`);
+        console.log(`📍 Location: ${latitude}, ${longitude} | Accuracy: ${accuracy || 'N/A'}m | Speed: ${speed || 0}m/s`);
       },
       error => {
         console.error('❌ Location error:', error);
         Alert.alert('Location Error', 'Failed to get location updates. Please check your GPS settings.');
       },
       {
-        enableHighAccuracy: true,
-        distanceFilter: 10,
-        interval: 3000, // Update every 3 seconds (faster notification refresh)
-        fastestInterval: 2000,
-        maximumAge: 0,
+        enableHighAccuracy: true, // Use GPS for maximum accuracy
+        distanceFilter: 0, // Get updates regardless of distance (time-based only)
+        interval: 1000, // Update every 1 second for real-time tracking
+        fastestInterval: 1000, // Minimum interval 1 second
+        maximumAge: 0, // Don't use cached locations
+        timeout: 5000, // 5 second timeout for location acquisition
+        useSignificantChanges: false, // Don't use significant changes (get all updates)
       }
     );
+
+    // Force notification updates every 1 second (keeps it visible and up-to-date)
+    notificationIntervalId.current = setInterval(() => {
+      if (!isPaused) {
+        updateNotification(false);
+      }
+    }, 1000); // Update notification every 1 second
 
     setIsTracking(true);
     setIsPaused(false);
@@ -283,6 +313,13 @@ const TrackMap = () => {
       Geolocation.clearWatch(watchId.current);
       watchId.current = null;
       console.log('📍 Location watch cleared');
+    }
+
+    // Clear notification update interval
+    if (notificationIntervalId.current !== null) {
+      clearInterval(notificationIntervalId.current);
+      notificationIntervalId.current = null;
+      console.log('🔔 Notification interval cleared');
     }
 
     try {
@@ -364,8 +401,12 @@ const TrackMap = () => {
             <Text style={styles.statLabel}>km/h</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statIcon}>📍</Text>
-            <Text style={styles.statValue}>{location?.accuracy || 'N/A'}</Text>
+            <Text style={styles.statIcon}>🎯</Text>
+            <Text style={styles.statValue}>
+              {location?.accuracy !== undefined && location?.accuracy !== null 
+                ? `${location.accuracy.toFixed(1)}m` 
+                : 'N/A'}
+            </Text>
             <Text style={styles.statLabel}>Accuracy</Text>
           </View>
         </ScrollView>
@@ -392,7 +433,23 @@ const TrackMap = () => {
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Accuracy:</Text>
-              <Text style={styles.infoValue}>{location.accuracy} meters</Text>
+              <Text style={[
+                styles.infoValue,
+                { 
+                  color: location.accuracy && location.accuracy < 10 ? '#10B981' : 
+                         location.accuracy && location.accuracy < 20 ? '#F59E0B' : '#EF4444',
+                  fontWeight: 'bold'
+                }
+              ]}>
+                {location.accuracy !== undefined && location.accuracy !== null 
+                  ? `${location.accuracy.toFixed(1)}m ${
+                      location.accuracy < 10 ? '(Excellent)' :
+                      location.accuracy < 20 ? '(Good)' :
+                      location.accuracy < 50 ? '(Fair)' : '(Poor)'
+                    }`
+                  : 'N/A'
+                }
+              </Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Speed:</Text>
